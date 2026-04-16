@@ -1,6 +1,7 @@
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
+const path = require("path");
 const db = require("./config/db");
 const bcrypt = require("bcryptjs");
 
@@ -9,16 +10,22 @@ const quizRoutes = require("./routes/quiz");
 
 const app = express();
 
+// ✅ CORS (safe default)
 app.use(cors({
   origin: "*"
 }));
+
 app.use(express.json());
+
+// =======================
+// SERVE FRONTEND (React build)
+// =======================
+app.use(express.static(path.join(__dirname, "../client/dist")));
 
 // =======================
 // CREATE TABLES + SEED DATA
 // =======================
 db.serialize(() => {
-  // USERS
   db.run(`
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -29,7 +36,6 @@ db.serialize(() => {
     )
   `);
 
-  // QUIZZES
   db.run(`
     CREATE TABLE IF NOT EXISTS quizzes (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -37,7 +43,6 @@ db.serialize(() => {
     )
   `);
 
-  // QUESTIONS
   db.run(`
     CREATE TABLE IF NOT EXISTS questions (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -51,7 +56,6 @@ db.serialize(() => {
     )
   `);
 
-  // RESULTS
   db.run(`
     CREATE TABLE IF NOT EXISTS results (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -62,9 +66,7 @@ db.serialize(() => {
     )
   `);
 
-  // =======================
-  // SEED USER (ONLY IF EMPTY)
-  // =======================
+  // Seed user
   db.get("SELECT COUNT(*) as count FROM users", async (err, row) => {
     if (row.count === 0) {
       const hash = await bcrypt.hash("123456", 10);
@@ -78,9 +80,7 @@ db.serialize(() => {
     }
   });
 
-  // =======================
-  // SEED QUIZ (ONLY IF EMPTY)
-  // =======================
+  // Seed quiz
   db.get("SELECT COUNT(*) as count FROM quizzes", (err, row) => {
     if (row.count === 0) {
       db.run("INSERT INTO quizzes (title) VALUES (?)", ["Math Quiz"]);
@@ -101,10 +101,17 @@ db.serialize(() => {
 });
 
 // =======================
-// ROUTES
+// API ROUTES
 // =======================
 app.use("/api/auth", authRoutes);
 app.use("/api/quiz", quizRoutes);
+
+// =======================
+// FRONTEND FALLBACK (React Router)
+// =======================
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "../client/dist/index.html"));
+});
 
 // =======================
 // START SERVER
